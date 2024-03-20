@@ -1,38 +1,63 @@
+// Set up requires
 const notes = require("express").Router();
 const fs = require("fs");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 
-const uuid = uuidv4();
+// Created helper function to read db.json file
+const readNotesFromFile = () => {
+    // Used try statement to read db.json but if there is nothing in the folder (i.e. no saved notes), it will catch and return an empty array
+    try {
+        const data = fs.readFileSync(path.join(__dirname, "../db/db.json"), "utf8");
+        return JSON.parse(data);
+    } catch (err) {
+        return [];
+    }
+};
 
-const dbFilePath = path.resolve(__dirname, "../db/db.json");
+// Created helper function to write to db.json
+const writeNotesToFile = (notes) => {
+    fs.writeFileSync(path.join(__dirname, "../db/db.json"), JSON.stringify(notes), "utf8");
+};
 
+// GET method to retrieve notes
 notes.get("/", (req, res) => {
-    res.sendFile(dbFilePath);
+    const notes = readNotesFromFile();
+    res.json(notes);
 });
 
+// POST method to save notes
 notes.post("/", (req, res) => {
-    console.info(`${req.method} request recevied to submit note`);
-    const data = fs.readFileSync(dbFilePath);
-    const notesData = JSON.parse(data);
+    const newNote = req.body;
 
-    const { title, text } = req.body;
-    const newNote = {
-        title,
-        text,
-        notesId: uuid,
-    };
+    // Generate uuid from npm uuid
+    newNote.id = uuidv4();
+    let notes = readNotesFromFile();
 
-    notesData.push(newNote);
-    fs.writeFileSync(dbFilePath, JSON.stringify(notesData));
-    res.json(notesData);
+    // Check to see if notes is an array, if it is not an array, it will generate an empty array
+    if (!Array.isArray(notes)) {
+        notes = [];
+    }
+
+    // Use array push method to add newNote into notes array
+    notes.push(newNote);
+
+    // Write notes to db.json and create the object for newNote
+    writeNotesToFile(notes);
+    res.json(newNote);
 });
 
+// DELETE method to delete based on uuid
 notes.delete("/:id", (req, res) => {
-    const data = fs.readFileSync(dbFilePath);
-    const deleteNote = data.filter(item => item.id !== req.params.id);
-    fs.writeFileSync(dbFilePath, JSON.stringify(deleteNote));
-    res.json(deleteNote);
-})
+
+    // req.params.id is the id for a note to be deleted
+    const noteId = req.params.id;
+    let notes = readNotesFromFile();
+
+    // Use filter method to delete note
+    notes = notes.filter(note => note.id !== noteId);
+    writeNotesToFile(notes);
+    res.sendStatus(204);
+});
 
 module.exports = notes;
